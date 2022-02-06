@@ -1,3 +1,7 @@
+## About this fork
+this fork add pinyin search support, you can type full pinyin or pinyin initials to search.
+you can get it from **[here](https://github.com/acgq/Switcheroo/releases)**
+
 <img src="logo.png" alt="Switcheroo" width="48px" height="48px"> Switcheroo  [![Build Status](https://img.shields.io/appveyor/ci/kvakulo/switcheroo.svg)](https://ci.appveyor.com/project/kvakulo/switcheroo) ![GPL License](https://img.shields.io/badge/license-GPL-brightgreen.svg)
 ==========
 

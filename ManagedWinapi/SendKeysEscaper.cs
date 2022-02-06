@@ -79,7 +79,7 @@ namespace ManagedWinapi
             {
                 lookupTable[i] = EscapableState.ALWAYS;
             }
-            foreach (char c in "%()+^`{}~´")
+            foreach (char c in "%()+^`{}~?")
             {
                 lookupTable[c] = EscapableState.BRACED_ONLY;
             }

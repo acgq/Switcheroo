@@ -12,13 +12,29 @@ namespace Switcheroo.Core.Matchers
         public MatchResult Evaluate(string input, string pattern)
         {
             var result = new MatchResult();
-            var sentence = PinYinSentence.Generate(input);
-            if (sentence.match(pattern))
+            if (input == null)
+            {
+                return result;
+            }
+
+            if (pattern == null)
+            {
+                result.StringParts.Add(new StringPart(input));
+                return result;
+            }
+
+            var match = PinYinMatch.match(input, pattern);
+            if (match != null)
             {
                 result.Matched = true;
                 result.Score = 3;
-                //@TODO - matched pinyin should be highlighted, but this is not supported by the current version
-                result.StringParts.Add(new StringPart(input));
+                var index = input.IndexOf(match.result);
+                result.StringParts.Add(new StringPart(input.Substring(0, index)));
+                result.StringParts.Add(new StringPart(match.result, true));
+                if (index + match.result.Length < input.Length)
+                {
+                    result.StringParts.Add(new StringPart(input.Substring(index + match.result.Length)));
+                }
             }
 
             return result;
@@ -28,7 +44,7 @@ namespace Switcheroo.Core.Matchers
 
     internal class PinYinSentence
     {
-        static readonly Dictionary<string, List<string>> pinyinMap = new Dictionary<string, List<string>>();
+        public static readonly Dictionary<string, List<string>> pinyinMap = new Dictionary<string, List<string>>();
 
         static readonly Func<List<String>, Func<List<StringBuilder>>> generateCopyList = (generateCopyList) =>
         {
@@ -49,6 +65,7 @@ namespace Switcheroo.Core.Matchers
                     {
                         continue;
                     }
+
                     var strings = line.Split('\t');
                     if (strings.Length == 2)
                     {
@@ -67,86 +84,126 @@ namespace Switcheroo.Core.Matchers
         {
             return pinyinSet.Any(pinyin => pinyin.Contains(sentence));
         }
+    }
 
-        public static PinYinSentence Generate(string rawSentence)
+    internal class PinYinMatch
+    {
+        private string value;
+        private List<string> pinyin;
+        private PinYinMatch child { get; set; }
+
+        public static PinYinMatchResult match(string input, string pattern)
         {
-            PinYinSentence sentence = new PinYinSentence();
-            sentence.rawSentence = rawSentence;
-            sentence.pinyinSet = new HashSet<string>();
-            List<StringBuilder> fullList = new List<StringBuilder>();
-            List<StringBuilder> shortList = new List<StringBuilder>();
-            bool hasPinYin = false;
-            foreach (var item in rawSentence.ToCharArray())
+            var inputMatch = generate(input);
+            return inputMatch.Select(charMatch => charMatch.matchPattern(pattern, 0))
+                .ToList()
+                .Find(result => result.match);
+        }
+
+        private PinYinMatchResult matchPattern(string pattern, int index)
+        {
+            if (pinyin != null)
+            {
+                if (index >= pattern.Length)
+                {
+                    return new PinYinMatchResult(true, 0, "");
+                }
+
+                var searchItem = pattern.Substring(index);
+                foreach (var item in pinyin)
+                {
+                    if (item.StartsWith(searchItem))
+                    {
+                        return new PinYinMatchResult(true, 1, value);
+                    }
+
+                    if (searchItem.StartsWith(item) && child != null)
+                    {
+                        var match = child.matchPattern(pattern, item.Length + index);
+
+                        if (match.match)
+                        {
+                            match.count = match.count + 1;
+                            match.result = value + match.result;
+                            return match;
+                        }
+                    }
+                }
+            }
+
+            if (child == null)
+            {
+                return new PinYinMatchResult(false, 0, "");
+            }
+
+            return child.matchPattern(pattern, 0);
+        }
+
+
+        private static List<PinYinMatch> generate(string input)
+        {
+            var result = new List<PinYinMatch>();
+            if (input.Length == 0)
+            {
+                return result;
+            }
+
+            var chars = input.ToCharArray();
+
+            PinYinMatch fullResult = full(new string(chars[0], 1));
+            PinYinMatch firstResult = first(new string(chars[0], 1));
+            PinYinMatch fullTemp = fullResult;
+            PinYinMatch firstTemp = firstResult;
+            foreach (var item in input.ToCharArray())
             {
                 string word = new string(item, 1);
-                if (pinyinMap.ContainsKey(word))
-                {
-                    var pinyinList = pinyinMap[word];
-                    if (hasPinYin)
-                    {
-                        if (pinyinList.Count == 1)
-                        {
-                            pinyinList.ForEach(pinyin =>
-                            {
-                                fullList.ForEach(builder => builder.Append(pinyin));
-                                shortList.ForEach(builder => builder.Append(pinyin.Substring(0, 1)));
-                            });
-                        }
-                        else if (pinyinList.Count > 1)
-                        {
-                            var fullCopy = generateCopyList(fullList.Select(builder => builder.ToString()).ToList());
-                            var shortCopy = generateCopyList(shortList.Select(builder => builder.ToString()).ToList());
-                            for (int i = 0; i < pinyinList.Count; i++)
-                            {
-                                var pinyin = pinyinList[i];
-                                if (i == 0)
-                                {
-                                    fullList.ForEach(builder => builder.Append(pinyin));
-                                    shortList.ForEach(builder => builder.Append(pinyin.Substring(0, 1)));
-                                }
-                                else
-                                {
-                                    fullList.AddRange(fullCopy().Select(builder => builder.Append(pinyin)).ToList());
-                                    shortList.AddRange(shortCopy()
-                                        .Select(builder => builder.Append(pinyin.Substring(0, 1))).ToList());
-                                }
-                            }
-                        }
-                    }
-                    else
-                    {
-                        fullList.AddRange(pinyinList.Select(pinyin => new StringBuilder(pinyin)).ToList());
-                        shortList.AddRange(pinyinList.Select(pinyin => new StringBuilder(pinyin.Substring(0, 1)))
-                            .ToList());
-                    }
-
-                    hasPinYin = true;
-                }
-                else
-                {
-                    if (fullList.Count > 0)
-                    {
-                        for (int i = 0; i < fullList.Count; i++)
-                        {
-                            sentence.pinyinSet.Add(fullList[i].ToString());
-                            sentence.pinyinSet.Add(shortList[i].ToString());
-                        }
-                    }
-
-                    hasPinYin = false;
-                }
+                var full = PinYinMatch.full(word);
+                var first = PinYinMatch.first(word);
+                fullTemp.child = full;
+                firstTemp.child = first;
+                fullTemp = full;
+                firstTemp = first;
             }
 
-            if (fullList.Count > 0)
-            {
-                for (int i = 0; i < fullList.Count; i++)
-                {
-                    sentence.pinyinSet.Add(fullList[i].ToString());
-                    sentence.pinyinSet.Add(shortList[i].ToString());
-                }
-            }
-
-            return sentence;
+            result.Add(fullResult);
+            result.Add(firstResult);
+            return result;
         }
+
+        static PinYinMatch full(string value)
+        {
+            var result = new PinYinMatch();
+            result.value = value;
+            result.pinyin = (PinYinSentence.pinyinMap.ContainsKey(value)
+                ? PinYinSentence.pinyinMap[value]
+                : new List<string>());
+            return result;
+        }
+
+        static PinYinMatch first(string value)
+        {
+            var result = new PinYinMatch();
+            result.value = value;
+            result.pinyin = (PinYinSentence.pinyinMap.ContainsKey(value)
+                    ? PinYinSentence.pinyinMap[value]
+                    : new List<string>())
+                .Select(s => s.Substring(0, 1))
+                .ToList();
+            return result;
+        }
+    }
+
+    internal class PinYinMatchResult
+    {
+        public PinYinMatchResult(bool match, int count, string result)
+        {
+            this.match = match;
+            this.count = count;
+            this.result = result;
+        }
+
+        public bool match { get; set; }
+        public int count { get; set; }
+        public string result { get; set; }
     }
 }

@@ -154,9 +154,9 @@ namespace Switcheroo.Core.Matchers
             PinYinMatch firstResult = first(new string(chars[0], 1));
             PinYinMatch fullTemp = fullResult;
             PinYinMatch firstTemp = firstResult;
-            foreach (var item in input.ToCharArray())
+            for (int i = 1; i < chars.Length; i++)
             {
-                string word = new string(item, 1);
+                string word = new string(chars[i], 1);
                 var full = PinYinMatch.full(word);
                 var first = PinYinMatch.first(word);
                 fullTemp.child = full;

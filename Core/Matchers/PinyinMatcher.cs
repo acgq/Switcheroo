@@ -121,9 +121,14 @@ namespace Switcheroo.Core.Matchers
                     {
                         var match = child.matchPattern(pattern, item.Length + index);
 
-                        if (match.match)
+                        if (match.match && !match.End)
                         {
-                            match.count = match.count + 1;
+                            if (index == 0)
+                            {
+                                match.End = true;
+                            }
+
+                            match.count += 1;
                             match.result = value + match.result;
                             return match;
                         }
@@ -205,5 +210,6 @@ namespace Switcheroo.Core.Matchers
         public bool match { get; set; }
         public int count { get; set; }
         public string result { get; set; }
+        public bool End { get; set; }
     }
 }

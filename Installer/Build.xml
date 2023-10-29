@@ -13,7 +13,7 @@
   <Target Name="Main">
 	<RemoveDir Directories="Output" ContinueOnError="true" />
 	<CallTarget Targets="CreateSetup" />
-	<CallTarget Targets="CreatePortable" />
+<!--	<CallTarget Targets="CreatePortable" />-->
 	<RemoveDir Directories="ProgramFiles" ContinueOnError="true" />
   </Target>
   
@@ -27,6 +27,7 @@
 		<ProgramFiles Include="$(SolutionDir)\Switcheroo\bin\Release\*.dll" />
 		<ProgramFiles Include="$(SolutionDir)\Switcheroo\bin\Release\*.exe" />
 		<ProgramFiles Include="$(SolutionDir)\Switcheroo\bin\Release\*.exe.config" />
+		<ProgramFiles Include="$(SolutionDir)\Switcheroo\bin\Release\*.txt" />
 		<ProgramFiles Include="$(SolutionDir)\LICENSE.txt" />
 	</ItemGroup>
 	<Copy SourceFiles="@(ProgramFiles)" DestinationFolder="ProgramFiles" />
@@ -43,6 +44,7 @@
 		<ProgramFiles Include="$(SolutionDir)\Switcheroo\bin\Release\*.dll" />
 		<ProgramFiles Include="$(SolutionDir)\Switcheroo\bin\Release\*.exe" />
 		<ProgramFiles Include="$(SolutionDir)\Switcheroo\bin\Release\*.exe.config" />
+		<ProgramFiles Include="$(SolutionDir)\Switcheroo\bin\Release\*.txt" />
 		<ProgramFiles Include="$(SolutionDir)\LICENSE.txt" />
 	</ItemGroup>
 	<Copy SourceFiles="@(ProgramFiles)" DestinationFolder="ProgramFiles" />

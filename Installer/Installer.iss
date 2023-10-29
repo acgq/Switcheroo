@@ -34,7 +34,7 @@ Name: startupfolder; Description: Startup with Windows
 Source: {#MyAppPath}\switcheroo.exe; DestDir: {app}; Flags: ignoreversion
 Source: {#MyAppPath}\*.dll; DestDir: {app}; Flags: ignoreversion
 Source: {#MyAppPath}\switcheroo.exe.config; DestDir: {app}; Flags: ignoreversion
-Source: {#MyAppPath}\LICENSE.txt; DestDir: {app}; Flags: ignoreversion
+Source: {#MyAppPath}\*.txt; DestDir: {app}; Flags: ignoreversion
 
 [Icons]
 Name: {group}\{#MyAppName}; Filename: {app}\{#MyAppExeName}

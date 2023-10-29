@@ -45,6 +45,7 @@ namespace Switcheroo.Core
             }
 
             return context.Windows
+                .AsParallel()
                 .Select(
                     w =>
                         new
@@ -74,20 +75,16 @@ namespace Switcheroo.Core
 
         private static List<MatchResult> Score(string title, string filterText)
         {
-            var startsWithMatcher = new StartsWithMatcher();
-            var containsMatcher = new ContainsMatcher();
-            var significantCharactersMatcher = new SignificantCharactersMatcher();
-            var individualCharactersMatcher = new IndividualCharactersMatcher();
-            var pinyinMatcher = new PinyinMatcher();
+            List<IMatcher> matchers = new List<IMatcher>();
+            matchers.Add(new StartsWithMatcher());
+            matchers.Add(new ContainsMatcher());
+            matchers.Add(new SignificantCharactersMatcher());
+            matchers.Add(new IndividualCharactersMatcher());
+            matchers.Add(new PinyinMatcher());
+            var results = matchers.AsParallel()
+                .Select(matcher => matcher.Evaluate(title,filterText))
+                .ToList();
 
-            var results = new List<MatchResult>
-            {
-                startsWithMatcher.Evaluate(title, filterText),
-                significantCharactersMatcher.Evaluate(title, filterText),
-                containsMatcher.Evaluate(title, filterText),
-                individualCharactersMatcher.Evaluate(title, filterText),
-                pinyinMatcher.Evaluate(title, filterText)
-            };
 
             return results;
         }

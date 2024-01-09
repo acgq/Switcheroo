@@ -594,7 +594,7 @@ namespace Switcheroo
             e.Handled = true;
         }
 
-        private void ListBoxItem_MouseDoubleClick(object sender, MouseButtonEventArgs e)
+        private void ListBoxItem_MouseSingleClick(object sender, MouseButtonEventArgs e)
         {
             Switch();
             e.Handled = true;

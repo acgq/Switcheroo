@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Runtime.Caching;
 using System.Text;
 
 namespace Switcheroo.Core.Matchers
@@ -23,17 +24,18 @@ namespace Switcheroo.Core.Matchers
                 return result;
             }
 
-            var match = PinYinMatch.match(input, pattern);
-            if (match != null)
+            var tuple = PinYinSentence.match(input, pattern);
+            if (tuple.Item1)
             {
                 result.Matched = true;
                 result.Score = 3;
-                var index = input.IndexOf(match.result);
-                result.StringParts.Add(new StringPart(input.Substring(0, index)));
-                result.StringParts.Add(new StringPart(match.result, true));
-                if (index + match.result.Length < input.Length)
+                var indexTuple = tuple.Item2;
+                result.StringParts.Add(new StringPart(input.Substring(0, indexTuple.Item1)));
+                result.StringParts.Add(
+                    new StringPart(input.Substring(indexTuple.Item1, indexTuple.Item2 - indexTuple.Item1 + 1), true));
+                if (indexTuple.Item2 < input.Length - 1)
                 {
-                    result.StringParts.Add(new StringPart(input.Substring(index + match.result.Length)));
+                    result.StringParts.Add(new StringPart(input.Substring(indexTuple.Item2 + 1)));
                 }
             }
 
@@ -46,6 +48,10 @@ namespace Switcheroo.Core.Matchers
     {
         public static readonly Dictionary<string, List<string>> pinyinMap = new Dictionary<string, List<string>>();
 
+        private static MemoryCache _cache = MemoryCache.Default;
+
+        private static CacheItemPolicy policy = new CacheItemPolicy();
+
         static readonly Func<List<String>, Func<List<StringBuilder>>> generateCopyList = (generateCopyList) =>
         {
             return () => generateCopyList.Select(item => new StringBuilder(item)).ToList();
@@ -53,6 +59,7 @@ namespace Switcheroo.Core.Matchers
 
         static PinYinSentence()
         {
+            policy.AbsoluteExpiration = DateTimeOffset.Now.AddHours(5);
             string path = Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location),
                 @"kTGHZ2013.txt");
             if (File.Exists(path))
@@ -75,141 +82,112 @@ namespace Switcheroo.Core.Matchers
             }
         }
 
-
-        String rawSentence;
-
-        HashSet<String> pinyinSet = new HashSet<string>();
-
-        public bool match(string sentence)
+        private static Tuple<bool, Tuple<int, int>> matchFull(Tuple<string, List<int>> tuple, string pattern)
         {
-            return pinyinSet.Any(pinyin => pinyin.Contains(sentence));
-        }
-    }
-
-    internal class PinYinMatch
-    {
-        private string value;
-        private List<string> pinyin;
-        private PinYinMatch child { get; set; }
-
-        public static PinYinMatchResult match(string input, string pattern)
-        {
-            var inputMatch = generate(input);
-            return inputMatch.Select(charMatch => charMatch.matchPattern(pattern, 0))
-                .ToList()
-                .Find(result => result.match);
-        }
-
-        private PinYinMatchResult matchPattern(string pattern, int index)
-        {
-            if (pinyin != null)
+            var fullPinyin = tuple.Item1;
+            var indexes = tuple.Item2;
+            for (var i = 0; i < indexes.Count; i++)
             {
-                if (index >= pattern.Length)
+                var startPos = fullPinyin.IndexOf(pattern, indexes[i]);
+                if (startPos == -1)
                 {
-                    return new PinYinMatchResult(true, 0, "");
+                    return new Tuple<bool, Tuple<int, int>>(false, null);
                 }
 
-                var searchItem = pattern.Substring(index);
-                foreach (var item in pinyin)
+                if (indexes.Contains(startPos))
                 {
-                    if (item.StartsWith(searchItem))
+                    var start = indexes.IndexOf(startPos);
+                    var end = 0;
+                    for (var i1 = 0; i1 < indexes.Count; i1++)
                     {
-                        return new PinYinMatchResult(true, 1, value);
-                    }
-
-                    if (searchItem.StartsWith(item) && child != null)
-                    {
-                        var match = child.matchPattern(pattern, item.Length + index);
-
-                        if (match.match && !match.End)
+                        if (indexes[i1] > startPos + pattern.Length - 1)
                         {
-                            if (index == 0)
-                            {
-                                match.End = true;
-                            }
-
-                            match.count += 1;
-                            match.result = value + match.result;
-                            return match;
+                            break;
+                        }
+                        else
+                        {
+                            end = i1;
                         }
                     }
+
+                    return new Tuple<bool, Tuple<int, int>>(true, new Tuple<int, int>(start, end));
                 }
             }
 
-            if (child == null)
+            return new Tuple<bool, Tuple<int, int>>(false, null);
+        }
+
+
+        public static Tuple<bool, Tuple<int, int>> match(string input, String pattern)
+        {
+            var prefixPinYinSentence = GetPrefixPinYinSentence(input);
+            var first = prefixPinYinSentence.FirstOrDefault(tuple => tuple.Item1.Contains(pattern));
+            if (first != null)
             {
-                return new PinYinMatchResult(false, 0, "");
+                var prefixString = first.Item1;
+                var start = prefixString.IndexOf(pattern);
+                var end = start + pattern.Length - 1;
+                return new Tuple<bool, Tuple<int, int>>(true, new Tuple<int, int>(start, end));
             }
 
-            return child.matchPattern(pattern, 0);
-        }
-
-
-        private static List<PinYinMatch> generate(string input)
-        {
-            var result = new List<PinYinMatch>();
-            if (input.Length == 0)
+            var pinYinSentence = GetFullPinYinSentence(input);
+            var fullMatch = pinYinSentence.Select(tuple => matchFull(tuple, pattern))
+                .ToList()
+                .Find(tuple => tuple.Item1);
+            if (fullMatch != null)
             {
-                return result;
+                return fullMatch;
             }
 
-            var chars = input.ToCharArray();
+            return new Tuple<bool, Tuple<int, int>>(false, null);
+        }
 
-            PinYinMatch fullResult = full(new string(chars[0], 1));
-            PinYinMatch firstResult = first(new string(chars[0], 1));
-            PinYinMatch fullTemp = fullResult;
-            PinYinMatch firstTemp = firstResult;
-            for (int i = 1; i < chars.Length; i++)
+        private static HashSet<Tuple<string, List<int>>> GetPrefixPinYinSentence(string input)
+        {
+            var results = new HashSet<Tuple<string, List<int>>>() {Tuple.Create("", new List<int>() {0})};
+            foreach (var c in input)
             {
-                string word = new string(chars[i], 1);
-                var full = PinYinMatch.full(word);
-                var first = PinYinMatch.first(word);
-                fullTemp.child = full;
-                firstTemp.child = first;
-                fullTemp = full;
-                firstTemp = first;
+                var key = c.ToString();
+                var pinyinMap = PinYinSentence.pinyinMap;
+                if (pinyinMap.ContainsKey(key))
+                {
+                    var pinyinList = pinyinMap[key];
+                    results = (from result in results
+                            from pinyin in pinyinList
+                            select Tuple.Create(result.Item1 + pinyin.First(),
+                                new List<int>(result.Item2) {result.Item2.Last() + pinyin.Length})
+                        ).ToHashSet();
+                }
             }
 
-            result.Add(fullResult);
-            result.Add(firstResult);
-            return result;
+            return results;
         }
 
-        static PinYinMatch full(string value)
+        private static HashSet<Tuple<string, List<int>>> GetFullPinYinSentence(string input)
         {
-            var result = new PinYinMatch();
-            result.value = value;
-            result.pinyin = (PinYinSentence.pinyinMap.ContainsKey(value)
-                ? PinYinSentence.pinyinMap[value]
-                : new List<string>());
-            return result;
-        }
+            if (_cache.Contains(input))
+            {
+                return (HashSet<Tuple<string, List<int>>>) _cache.Get(input);
+            }
 
-        static PinYinMatch first(string value)
-        {
-            var result = new PinYinMatch();
-            result.value = value;
-            result.pinyin = (PinYinSentence.pinyinMap.ContainsKey(value)
-                    ? PinYinSentence.pinyinMap[value]
-                    : new List<string>())
-                .Select(s => s.Substring(0, 1))
-                .ToList();
-            return result;
-        }
-    }
+            var results = new HashSet<Tuple<string, List<int>>>() {Tuple.Create("", new List<int>() {0})};
+            foreach (var c in input)
+            {
+                var key = c.ToString();
+                var pinyinMap = PinYinSentence.pinyinMap;
+                if (pinyinMap.ContainsKey(key))
+                {
+                    var pinyinList = pinyinMap[key];
+                    results = (from result in results
+                            from pinyin in pinyinList
+                            select Tuple.Create(result.Item1 + pinyin,
+                                new List<int>(result.Item2) {result.Item2.Last() + pinyin.Length})
+                        ).ToHashSet();
+                }
+            }
 
-    internal class PinYinMatchResult
-    {
-        public PinYinMatchResult(bool match, int count, string result)
-        {
-            this.match = match;
-            this.count = count;
-            this.result = result;
+            _cache.Set(input, results, policy);
+            return results;
         }
-
-        public bool match { get; set; }
-        public int count { get; set; }
-        public string result { get; set; }
-        public bool End { get; set; }
     }
 }

@@ -18,6 +18,7 @@
  * along with Switcheroo.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Xml.Linq;
@@ -43,7 +44,17 @@ namespace Switcheroo.Core
                     xDocument.Root.Add(new XText(stringPart.Value));
                 }
             }
-            return string.Join("", xDocument.Root.Nodes().Select(x => x.ToString()).ToArray());
+            return string.Join("", xDocument.Root?.Nodes().Select(x =>
+            {
+                try
+                {
+                   return x.ToString();
+                }
+                catch (Exception e)
+                {
+                    return "";
+                } 
+            }).ToArray()??Array.Empty<string>());
         }
     }
 }

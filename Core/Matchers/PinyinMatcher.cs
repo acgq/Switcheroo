@@ -158,6 +158,13 @@ namespace Switcheroo.Core.Matchers
                                 new List<int>(result.Item2) {result.Item2.Last() + pinyin.Length})
                         ).ToHashSet();
                 }
+                else
+                {
+                     results = (from result in results
+                            select Tuple.Create(result.Item1 + key,
+                                new List<int>(result.Item2) {result.Item2.Last() + 1})
+                        ).ToHashSet();                   
+                }
             }
 
             return results;
@@ -182,6 +189,13 @@ namespace Switcheroo.Core.Matchers
                             from pinyin in pinyinList
                             select Tuple.Create(result.Item1 + pinyin,
                                 new List<int>(result.Item2) {result.Item2.Last() + pinyin.Length})
+                        ).ToHashSet();
+                }
+                else
+                {
+                    results = (from result in results
+                            select Tuple.Create(result.Item1 + key,
+                                new List<int>(result.Item2) {result.Item2.Last() + 1})
                         ).ToHashSet();
                 }
             }
